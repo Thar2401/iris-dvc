@@ -1,0 +1,32 @@
+name: model-training
+on: [pull_request]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: iterative/setup-cml@v2
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Reproduce experiment
+        env:
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dvc pull || true
+          dvc repro
+          echo "## Metrics" > report.md
+          cat metrics.json >> report.md
+          echo "## Metrics diff vs main" >> report.md
+          git fetch origin main --depth=1
+          dvc metrics diff origin/main --md >> report.md
+          echo "## Params diff vs main" >> report.md
+          dvc params diff origin/main --md >> report.md
+          cml comment create report.md
